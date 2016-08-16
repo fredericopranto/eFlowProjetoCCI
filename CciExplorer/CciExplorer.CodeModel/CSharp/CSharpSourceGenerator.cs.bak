@@ -1,0 +1,1802 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Microsoft.Cci;
+using Microsoft.Cci.ILToCodeModel;
+using TourreauGilles.CciExplorer.CodeModel;
+using Microsoft.Cci.MutableCodeModel;
+using System.Xml.Serialization;
+
+namespace TourreauGilles.CciExplorer.CSharp
+{
+
+    [XmlRoot("assembly")]
+    public class eFlowAssembly
+    {
+        [XmlElement("name")]
+        public string Name { get; set; }
+        [XmlElement("version")]
+        public string Version { get; set; }
+        [XmlElement("createdAt")]
+        public string CreatedAt { get; set; }
+        [XmlElement("language")]
+        public string Language { get; set; }
+        [XmlElement("analyzer")]
+        public bool Analyzer { get; set; }
+
+        private readonly List<eFlowException> _Exceptions = new List<eFlowException>();
+        private readonly List<eFlowType> _Types = new List<eFlowType>();
+        private readonly List<eFlowMethodCall> _MethodCalls = new List<eFlowMethodCall>();
+
+        [XmlArray("exceptions")]
+        [XmlArrayItem("exception")]
+        public List<eFlowException> Exceptions { get { return _Exceptions; } }
+        [XmlArray("types")]
+        [XmlArrayItem("type")]
+        public List<eFlowType> Types { get { return _Types; } }
+        [XmlArray("methodCalls")]
+        [XmlArrayItem("methodCall")]
+        public List<eFlowMethodCall> MethodCalls { get { return _MethodCalls; } }
+
+        public void RegisterException(string Exeception)
+        {
+
+            if (this.Exceptions.FindAll(
+                                        delegate(eFlowException e)
+                                        {
+                                            return e.Name.Equals(Exeception);
+                                        }).Count == 0)
+            {
+                eFlowException eFlowException = new eFlowException();
+                try
+                {
+                    eFlowException.Name = Type.GetType(Exeception).ToString();
+                }
+                catch (Exception)
+                {
+                    //TODO: Generalizar esta solução (Percorrer todas as referencias da dll principal)
+                    eFlowException.Name = Type.GetType(Exeception + ", ClassLibraryExemplo").ToString();
+                }
+                try
+                {
+                    eFlowException.BaseName = Type.GetType(Exeception).BaseType.ToString();
+                }
+                catch (Exception)
+                {
+                    //TODO: Generalizar esta solução (Percorrer todas as referencias da dll principal)
+                    eFlowException.BaseName = Type.GetType(Exeception + ", ClassLibraryExemplo").BaseType.ToString();
+                }
+
+                this.Exceptions.Add(eFlowException);
+            }
+        }
+    }
+
+    [XmlRoot("exception")]
+    public class eFlowException
+    {
+        [XmlElement("name")]
+        public string Name { get; set; }
+        [XmlElement("baseName")]
+        public string BaseName { get; set; }
+    }
+
+    [XmlRoot("type")]
+    public class eFlowType
+    {
+        [XmlElement("name")]
+        public string Name { get; set; }
+        [XmlElement("fullName")]
+        public string FullName { get; set; }
+        [XmlElement("kind")]
+        public string Kind { get; set; }
+
+        private readonly List<eFlowMethod> _Methods = new List<eFlowMethod>();
+
+        [XmlArray("methods")]
+        [XmlArrayItem("method")]
+        public List<eFlowMethod> Methods { get { return _Methods; } }
+    }
+
+    [XmlRoot("method")]
+    public class eFlowMethod
+    {
+        [XmlElement("name")]
+        public string Name { get; set; }
+        [XmlElement("fullName")]
+        public string FullName { get; set; }
+        [XmlElement("visibility")]
+        public string Visibility { get; set; }
+        [XmlElement("qtdTry")]
+        public int QtdTry { get; set; }
+        [XmlElement("qtdCatch")]
+        public int QtdCatch { get; set; }
+        [XmlElement("qtdCatchGeneric")]
+        public int QtdCatchGeneric { get; set; }
+        [XmlElement("qtdCatchSpecialized")]
+        public int QtdCatchSpecialized { get; set; }
+        [XmlElement("qtdThrow")]
+        public int QtdThrow { get; set; }
+        [XmlElement("qtdFinally")]
+        public int QtdFinally { get; set; }
+        //[XmlIgnore]
+        //public IMethodDefinition MethodDefinition { get; set; }
+
+        private readonly List<eFlowMethodException> _MethodExceptions = new List<eFlowMethodException>();
+
+        [XmlArray("methodExceptions")]
+        [XmlArrayItem("methodException")]
+        public List<eFlowMethodException> MethodExceptions { get { return _MethodExceptions; } }
+
+    }
+
+    [XmlRoot("methodException")]
+    public class eFlowMethodException
+    {
+        [XmlElement("throwsIntoCatch")]
+        public eFlowThrowsIntoCatch ThrowsIntoCatch { get; set; }
+        [XmlElement("exception")]
+        public eFlowAttributeReference ExceptionReference { get; set; }
+        [XmlElement("kind")]
+        public string Kind { get; set; }
+        [XmlElement("isGeneric")]
+        public bool IsGeneric { get; set; }
+        [XmlElement("startOffSet")]
+        public int StartOffSet { get; set; }
+        [XmlElement("endOffSet")]
+        public int EndOffSet { get; set; }
+    }
+
+    [XmlRoot("methodCall")]
+    public class eFlowMethodCall
+    {
+        [XmlElement("methodSource")]
+        public eFlowAttributeReference MethodSourceReference { get; set; }
+        [XmlElement("methodTarget")]
+        public eFlowAttributeReference MethodTargetReference { get; set; }
+        [XmlElement("offSet")]
+        public int OffSet { get; set; }
+        [XmlElement("order")]
+        public int Order { get; set; }
+    }
+
+    public class eFlowAttributeReference
+    {
+        [XmlAttribute("reference")]
+        public int Reference;
+    }
+
+    [XmlRoot("throwsIntoCatch")]
+    public class eFlowThrowsIntoCatch
+    {
+        [XmlElement("string")]
+        public string String { get; set; }
+    }
+
+    public class CSharpSourceGenerator : SourceVisitor
+    {
+        private readonly IMetadataReaderHost metadataHost;
+        //private readonly ICSharpSourceWriter writer;
+        private eFlowAssembly eFlowAssembly;
+
+        private const string ItemPropertyName = "Item";
+
+        public CSharpSourceGenerator(IMetadataReaderHost metadataHost, ICSharpSourceWriter writer)
+        {
+            this.metadataHost = metadataHost;
+            //this.writer = writer;
+        }
+
+        public CSharpSourceGenerator(IMetadataReaderHost metadataHost, eFlowAssembly eFlowAssembly)
+        {
+            this.metadataHost = metadataHost;
+            this.eFlowAssembly = eFlowAssembly;
+        }
+
+        public IPlatformType PlatformType
+        {
+            get { return this.metadataHost.PlatformType; }
+        }
+
+        private void GenerateVisibility(ITypeDefinitionMember memberDefinition)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.GetVisibility(memberDefinition));
+        }
+
+        private string GetVisibility(ITypeDefinitionMember memberDefinition)
+        {
+            return CSharpLanguage.GetVisibility(memberDefinition);
+        }
+
+        private void GenerateVisibilityAndModifier(IMethodDefinition method)
+        {
+            if (method.ContainingTypeDefinition.IsInterface == false)
+            {
+                this.GenerateVisibility(method);
+
+                string modifier;
+                modifier = CSharpLanguage.GetModifier(method);
+
+                if (modifier != null)
+                {
+                    //this.writer.WriteSpace();
+                    //this.writer.WriteKeyword(modifier);
+                }
+
+                //this.writer.WriteSpace();
+            }
+        }
+
+        private void GenerateCommaSeparateItems<T>(IEnumerable<T> items, Action<T> visitMethod)
+        {
+            IList<T> list;
+
+            list = items.ToList();
+
+            if (list.Count > 0)
+            {
+                visitMethod(list[0]);
+
+                for (int i = 1; i < list.Count(); i++)
+                {
+                    //this.writer.Write(CSharpLanguage.CommaToken);
+                    //this.writer.WriteSpace();
+
+                    visitMethod(list[i]);
+                }
+            }
+        }
+
+        public override void Visit(IAddition addition)
+        {
+            this.Visit(addition, CSharpLanguage.AdditionToken);
+        }
+
+        public override void Visit(IAndOperation andExpression)
+        {
+            this.Visit(andExpression, CSharpLanguage.AndToken);
+        }
+
+        public override void Visit(IArrayIndexer arrayIndexer)
+        {
+            foreach (IExpression indice in arrayIndexer.Indices)
+            {
+                //this.writer.Write(CSharpLanguage.LeftSquareBracket);
+                this.Visit(indice);
+                //this.writer.Write(CSharpLanguage.RightSquareBracket);
+            }
+        }
+
+        public override void Visit(IArrayTypeReference arrayTypeReference)
+        {
+            this.Visit(arrayTypeReference.ElementType);
+            //this.writer.Write(CSharpLanguage.LeftSquareBracket);
+            //this.writer.Write(CSharpLanguage.RightSquareBracket);
+        }
+
+        public override void Visit(IAssignment assignment)
+        {
+            this.Visit(assignment.Target);
+
+            //this.writer.WriteSpace();
+            //this.writer.Write(CSharpLanguage.AssignToken);
+            //this.writer.WriteSpace();
+
+            this.Visit(assignment.Source);
+        }
+
+        public void Visit(IBinaryOperation binaryOperation, string operatorToken)
+        {
+            //this.writer.WriteLeftParenthesis();
+
+            this.Visit(binaryOperation.LeftOperand);
+
+            //this.writer.WriteSpace();
+            //this.writer.Write(operatorToken);
+            //this.writer.WriteSpace();
+
+            this.Visit(binaryOperation.RightOperand);
+
+            //this.writer.WriteRightParenthesis();
+        }
+
+        public override void Visit(IBitwiseAnd bitwiseAnd)
+        {
+            this.Visit(bitwiseAnd, CSharpLanguage.BitwiseAndToken);
+        }
+
+        public override void Visit(IBitwiseOr bitwiseOr)
+        {
+            this.Visit(bitwiseOr, CSharpLanguage.BitwiseOrToken);
+        }
+
+        public override void Visit(IBlockStatement block)
+        {
+            //this.writer.OpenBlock();
+            base.Visit(block);
+            //this.writer.CloseBlock();
+        }
+
+        public override void Visit(IBoundExpression boundExpression)
+        {
+            if (boundExpression.Instance != null)
+            {
+                this.Visit(boundExpression.Instance);
+            }
+
+            ILocalDefinition local = boundExpression.Definition as ILocalDefinition;
+
+            if (local != null)
+            {
+                this.VisitReference(local);
+            }
+            else
+            {
+                IParameterDefinition parameter = boundExpression.Definition as IParameterDefinition;
+                if (parameter != null)
+                {
+                    this.VisitReference(parameter);
+                }
+                else
+                {
+                    if (boundExpression.Instance == null)
+                    {
+                        // Write the static class
+                        this.Visit(boundExpression.Type);
+                    }
+
+                    //this.writer.Write(CSharpLanguage.PointToken);
+
+                    IFieldReference field = (IFieldReference)boundExpression.Definition;
+
+                    this.Visit(field);
+                }
+            }
+        }
+
+        public override void Visit(IBreakStatement breakStatement)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.BreakToken);
+            //this.writer.WriteEndInstruction();
+        }
+
+        public override void Visit(ICastIfPossible castIfPossible)
+        {
+            //this.writer.WriteLeftParenthesis();
+
+            this.Visit(castIfPossible.ValueToCast);
+
+            //this.writer.WriteSpace();
+            //this.writer.WriteKeyword(CSharpLanguage.AsToken);
+            //this.writer.WriteSpace();
+
+            this.Visit(castIfPossible.TargetType);
+
+            //this.writer.WriteRightParenthesis();
+        }
+
+        public override void Visit(ICatchClause catchClause)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.CatchToken);
+
+            if (catchClause.ExceptionContainer != Dummy.LocalVariable)
+            {
+                //this.writer.WriteSpace();
+
+                //this.writer.WriteLeftParenthesis();
+                this.Visit(catchClause.ExceptionContainer);
+                //this.writer.WriteRightParenthesis();
+            }
+
+            this.Visit(catchClause.Body);
+        }
+
+        public override void Visit(ICheckIfInstance checkIfInstance)
+        {
+            //this.writer.WriteLeftParenthesis();
+
+            this.Visit(checkIfInstance.Operand);
+
+            //this.writer.WriteSpace();
+            //this.writer.WriteKeyword(CSharpLanguage.IsToken);
+            //this.writer.WriteSpace();
+
+            this.Visit(checkIfInstance.TypeToCheck);
+
+            //this.writer.WriteRightParenthesis();
+        }
+
+        public override void Visit(ICompileTimeConstant constant)
+        {
+            this.VisitConstant(constant.Type, constant.Value);
+        }
+
+        public override void Visit(IConditional conditional)
+        {
+            //this.writer.WriteLeftParenthesis();
+
+            // Write the condition
+            //this.writer.WriteLeftParenthesis();
+            this.Visit(conditional.Condition);
+            //this.writer.WriteRightParenthesis();
+
+            // Write the true expression
+            //this.writer.WriteSpace();
+            //this.writer.Write(CSharpLanguage.QuestionMarkToken);
+            //this.writer.WriteSpace();
+            //this.writer.WriteLeftParenthesis();
+            this.Visit(conditional.ResultIfTrue);
+            //this.writer.WriteRightParenthesis();
+
+            // Write the false expression
+            //this.writer.WriteSpace();
+            //this.writer.Write(CSharpLanguage.ColonToken);
+            //this.writer.WriteSpace();
+            //this.writer.WriteLeftParenthesis();
+            this.Visit(conditional.ResultIfFalse);
+            //this.writer.WriteRightParenthesis();
+
+            //this.writer.WriteRightParenthesis();
+        }
+
+        public override void Visit(IConditionalStatement conditionalStatement)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.IfToken);
+            //this.writer.WriteSpace();
+
+            // Write the condition
+            if (conditionalStatement.Condition is IBoundExpression)
+            {
+                //this.writer.WriteLeftParenthesis();
+                this.Visit(conditionalStatement.Condition);
+                //this.writer.WriteRightParenthesis();
+            }
+            else
+            {
+                this.Visit(conditionalStatement.Condition);
+            }
+
+            // Write true block
+            this.Visit(conditionalStatement.TrueBranch);
+
+            // Write false block if needed
+            if (!(conditionalStatement.FalseBranch is IEmptyStatement))
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.ElseToken);
+
+                this.Visit(conditionalStatement.FalseBranch);
+            }
+        }
+
+        public override void Visit(IConversion conversion)
+        {
+            //this.writer.Write(CSharpLanguage.LeftParenthesisToken);
+            this.Visit(conversion.TypeAfterConversion);
+            //this.writer.Write(CSharpLanguage.RightParenthesisToken);
+
+            this.Visit(conversion.ValueToConvert);
+        }
+
+        public override void Visit(ICustomAttribute customAttribute)
+        {
+            //this.writer.Write(CSharpLanguage.LeftSquareBracket);
+
+            this.Visit(customAttribute.Type);
+
+            //this.writer.WriteLeftParenthesis();
+            this.Visit(customAttribute.Arguments);
+
+            if (customAttribute.NumberOfNamedArguments > 0)
+            {
+                if (customAttribute.Arguments.Count() > 0)
+                {
+                    // Add a comma
+                    //this.writer.Write(CSharpLanguage.CommaToken);
+                    //this.writer.WriteSpace();
+                }
+
+                this.Visit(customAttribute.NamedArguments);
+            }
+
+            //this.writer.WriteRightParenthesis();
+
+            //this.writer.Write(CSharpLanguage.RightSquareBracket);
+        }
+
+        public override void Visit(ICreateArray createArray)
+        {
+            // "new "
+            //this.writer.WriteKeyword(CSharpLanguage.NewToken);
+            //this.writer.WriteSpace();
+
+            // "type"
+            this.Visit(createArray.ElementType);
+
+            // Write each dimension size
+            foreach (IExpression size in createArray.Sizes)
+            {
+                //this.writer.Write(CSharpLanguage.LeftSquareBracket);
+                this.Visit(size);
+                //this.writer.Write(CSharpLanguage.RightSquareBracket);
+            }
+        }
+
+        public override void Visit(ICreateObjectInstance createObjectInstance)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.NewToken);
+            //this.writer.WriteSpace();
+            this.Visit(createObjectInstance.Type);
+
+            this.Visit(createObjectInstance.Arguments);
+        }
+
+        public override void Visit(IDefaultValue defaultValue)
+        {
+            if (defaultValue.DefaultValueType.IsValueType == false)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.NullToken);
+            }
+            else
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.DefaultToken);
+                //this.writer.WriteLeftParenthesis();
+                this.Visit(defaultValue.DefaultValueType);
+                //this.writer.WriteRightParenthesis();
+            }
+        }
+
+        public override void Visit(IDivision division)
+        {
+            this.Visit(division, CSharpLanguage.DivisionToken);
+        }
+
+        public override void Visit(IEnumerable<ICustomAttribute> customAttributes)
+        {
+            foreach (ICustomAttribute attribute in customAttributes)
+            {
+                this.Visit(attribute);
+                //this.writer.NewLine();
+            }
+        }
+
+        public override void Visit(IEnumerable<IFieldDefinition> fields)
+        {
+            foreach (IFieldDefinition field in fields)
+            {
+                this.Visit(field);
+                //this.writer.NewLine();
+            }
+        }
+
+        public override void Visit(IEnumerable<IEventDefinition> events)
+        {
+            foreach (IEventDefinition evt in events)
+            {
+                this.Visit(evt);
+                //this.writer.NewLine();
+            }
+        }
+
+        public override void Visit(IEnumerable<IExpression> expressions)
+        {
+            IExpression[] arguments;
+
+            //this.writer.Write(CSharpLanguage.LeftParenthesisToken);
+
+            arguments = expressions.ToArray();
+            if (arguments.Length > 0)
+            {
+                this.Visit(arguments[0]);
+
+                for (int i = 1; i < arguments.Length; i++)
+                {
+                    //this.writer.Write(CSharpLanguage.CommaToken);
+                    //this.writer.WriteSpace();
+
+                    this.Visit(arguments[i]);
+                }
+            }
+
+            //this.writer.Write(CSharpLanguage.RightParenthesisToken);
+        }
+
+        public override void Visit(IEnumerable<IGenericMethodParameter> genericParameters)
+        {
+            IGenericMethodParameter[] temp;
+
+            temp = genericParameters.ToArray();
+            if (temp.Length > 0)
+            {
+                //this.writer.Write(CSharpLanguage.LeftAngleBracket);
+
+                this.GenerateCommaSeparateItems(genericParameters, g => this.Visit(g));
+
+                //this.writer.Write(CSharpLanguage.RightAngleBracket);
+            }
+        }
+
+        public override void Visit(IEnumerable<IGenericTypeParameter> genericParameters)
+        {
+            IGenericTypeParameter[] temp;
+
+            temp = genericParameters.ToArray();
+            if (temp.Length > 0)
+            {
+                //this.writer.Write(CSharpLanguage.LeftAngleBracket);
+
+                this.GenerateCommaSeparateItems(genericParameters, g => this.Visit(g));
+
+                //this.writer.Write(CSharpLanguage.RightAngleBracket);
+            }
+        }
+
+        public override void Visit(IEnumerable<IMetadataExpression> expressions)
+        {
+            this.GenerateCommaSeparateItems(expressions, e => this.Visit(e));
+        }
+
+        public override void Visit(IEnumerable<IMetadataNamedArgument> namedArguments)
+        {
+            this.GenerateCommaSeparateItems(namedArguments, a => this.Visit(a));
+        }
+
+        public override void Visit(IEnumerable<IMethodDefinition> methods)
+        {
+            foreach (IMethodDefinition method in methods)
+            {
+                eFlowMethod eFlowMethod = new eFlowMethod();
+                eFlowMethod.Name = method.Name.Value;
+                eFlowMethod.FullName = method.ToString();
+                eFlowMethod.Visibility = GetVisibility(method);
+                //eFlowMethod.MethodDefinition = method;
+
+                this.eFlowAssembly.Types.Last<eFlowType>().Methods.Add(eFlowMethod);
+
+                this.Visit(method);
+            }
+        }
+
+        public override void Visit(IEnumerable<IParameterDefinition> parameters)
+        {
+            //this.writer.Write(CSharpLanguage.LeftParenthesisToken);
+            GenerateCommaSeparateItems(parameters, p => this.Visit(p));
+            //this.writer.Write(CSharpLanguage.RightParenthesisToken);
+        }
+
+        public override void Visit(IEnumerable<IPropertyDefinition> properties)
+        {
+            foreach (IPropertyDefinition property in properties)
+            {
+                this.Visit(property);
+                //this.writer.NewLine();
+            }
+        }
+
+        public override void Visit(IEnumerable<ISwitchCase> switchCases)
+        {
+            //this.writer.OpenBlock();
+            base.Visit(switchCases);
+            //this.writer.CloseBlock();
+        }
+
+        public override void Visit(IEquality equality)
+        {
+            this.Visit(equality, CSharpLanguage.EqualToken);
+        }
+
+        public override void Visit(IEventDefinition eventDefinition)
+        {
+            // Write the visibility and modifiers
+            this.GenerateVisibility(eventDefinition);
+            //this.writer.WriteSpace();
+
+            // Write the event keyword
+            //this.writer.WriteKeyword(CSharpLanguage.EventToken);
+            //this.writer.WriteSpace();
+
+            // Write event type
+            this.Visit(eventDefinition.Type);
+            //this.writer.WriteSpace();
+
+            // Write the event name
+            //this.writer.Write(eventDefinition);
+
+            // Write adder and remove block
+            //this.writer.OpenBlock();
+
+            //this.writer.WriteKeyword(CSharpLanguage.AddToken);
+            this.Visit(eventDefinition.Adder.ResolvedMethod.Body);
+
+            //this.writer.WriteKeyword(CSharpLanguage.RemoveToken);
+            this.Visit(eventDefinition.Remover.ResolvedMethod.Body);
+
+            //this.writer.CloseBlock();
+        }
+
+        public override void Visit(IExpressionStatement expressionStatement)
+        {
+            this.Visit(expressionStatement.Expression);
+
+            //this.writer.WriteEndInstruction();
+        }
+
+        public override void Visit(IFieldDefinition fieldDefinition)
+        {
+            this.Visit(fieldDefinition.Attributes);
+
+            // Write the visibility and modifiers
+            this.GenerateVisibility(fieldDefinition);
+
+            string modifier;
+            modifier = CSharpLanguage.GetModifier(fieldDefinition);
+
+            if (modifier != null)
+            {
+                //this.writer.WriteSpace();
+                //this.writer.WriteKeyword(modifier);
+            }
+
+            //this.writer.WriteSpace();
+
+            // Write the type of field
+            this.Visit(fieldDefinition.Type);
+            //this.writer.WriteSpace();
+
+            // Write the field name
+            //this.writer.Write(fieldDefinition);
+
+            //this.writer.WriteEndInstruction();
+        }
+
+        public override void Visit(IFieldReference fieldReference)
+        {
+            //this.writer.WriteReference(fieldReference);
+        }
+
+        public override void Visit(ILeftShift leftShift)
+        {
+            this.Visit(leftShift, CSharpLanguage.LeftShiftToken);
+        }
+
+        public override void Visit(ILessThan lessThan)
+        {
+            this.Visit(lessThan, CSharpLanguage.LessThanToken);
+        }
+
+        public override void Visit(ILessThanOrEqual lessThanOrEqual)
+        {
+            this.Visit(lessThanOrEqual, CSharpLanguage.LessThanOrEqualToken);
+        }
+
+        public override void Visit(ILocalDeclarationStatement localDeclarationStatement)
+        {
+            this.Visit(localDeclarationStatement.LocalVariable);
+
+            if (localDeclarationStatement.InitialValue != null)
+            {
+                //this.writer.WriteSpace();
+                //this.writer.Write(CSharpLanguage.AssignToken);
+                //this.writer.WriteSpace();
+
+                this.Visit(localDeclarationStatement.InitialValue);
+            }
+
+            //this.writer.WriteEndInstruction();
+        }
+
+        public override void Visit(ILocalDefinition localDefinition)
+        {
+            this.Visit(localDefinition.Type);
+
+            //this.writer.WriteSpace();
+            //this.writer.Write(localDefinition);
+        }
+
+        public override void Visit(ILogicalNot logicalNot)
+        {
+            //this.writer.Write(CSharpLanguage.NotToken);
+
+            //this.writer.WriteLeftParenthesis();
+            this.Visit(logicalNot.Operand);
+            //this.writer.WriteRightParenthesis();
+        }
+
+        public override void Visit(IMetadataConstant constant)
+        {
+            this.VisitConstant(constant.Type, constant.Value);
+        }
+
+        public override void Visit(IMetadataCreateArray createArray)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.NewToken);
+            //this.writer.WriteSpace();
+
+            this.Visit(createArray.ElementType);
+            //this.writer.Write(CSharpLanguage.LeftSquareBracket);
+            //this.writer.Write(CSharpLanguage.RightSquareBracket);
+            //this.writer.WriteSpace();
+
+            //this.writer.Write(CSharpLanguage.LeftCurlyToken);
+            this.GenerateCommaSeparateItems(createArray.Initializers, i => this.Visit(i));
+            //this.writer.Write(CSharpLanguage.RightCurlyToken);
+        }
+
+        public override void Visit(IMetadataExpression expression)
+        {
+            expression.Dispatch(this);
+        }
+
+        public override void Visit(IMetadataNamedArgument namedArgument)
+        {
+            //this.writer.Write(namedArgument.ArgumentName);
+
+            //this.writer.WriteSpace();
+            //this.writer.Write(CSharpLanguage.AssignToken);
+            //this.writer.WriteSpace();
+
+            this.Visit(namedArgument.ArgumentValue);
+        }
+
+        public override void Visit(IMetadataTypeOf typeOf)
+        {
+            this.VisitTypeOf(typeOf.TypeToGet);
+        }
+
+        public override void Visit(IMethodBody methodBody)
+        {
+            ISourceMethodBody sourceMethodBody;
+
+            sourceMethodBody = Decompiler.GetCodeModelFromMetadataModel(this.metadataHost, methodBody, null);
+
+            VisitTryCatch(sourceMethodBody.Block);
+
+            if (methodBody.MethodDefinition.IsConstructor == true)
+            {
+                // Get the first statement
+                // The first statement is a constructor call (base() or this() invocation)
+                IExpressionStatement statement;
+
+                statement = (IExpressionStatement)sourceMethodBody.Block.Statements.ElementAt(0);
+                this.VisitConstructorCall((IMethodCall)statement.Expression);
+            }
+
+            this.Visit(sourceMethodBody.Block);
+        }
+
+        public override void Visit(IMethodCall methodCall)
+        {
+            // If the method is a constructor ignore it
+            if (methodCall.MethodToCall.ResolvedMethod.IsConstructor == true)
+            {
+                return;
+            }
+
+            if (methodCall.IsStaticCall == false)
+            {
+                // Non static call, generate instance
+                this.Visit(methodCall.ThisArgument);
+            }
+            else
+            {
+                // Write the static class
+                this.Visit(methodCall.MethodToCall.ContainingType);
+            }
+            //this.writer.Write(CSharpLanguage.PointToken);
+
+            // Test if the method is a getter or setter
+            IPropertyDefinition property;
+
+            property = methodCall.MethodToCall.ResolvedMethod.GetProperty();
+            if (property == null)
+            {
+                // Write parameters
+                this.Visit(methodCall.Arguments);
+            }
+            else
+            {
+                this.VisitPropertyReference(property, methodCall);
+            }
+        }
+
+        private void VisitGenericParameters(IEnumerable<IGenericParameter> genericParameters)
+        {
+            if (genericParameters.Count() > 0)
+            {
+                //this.writer.Write(CSharpLanguage.LeftAngleBracket);
+                this.GenerateCommaSeparateItems(genericParameters, g => this.Visit(g));
+                //this.writer.Write(CSharpLanguage.RightAngleBracket);
+            }
+        }
+
+        public override void Visit(IMethodDefinition method)
+        {
+            this.Visit(method.Attributes);
+
+            this.GenerateVisibilityAndModifier(method);
+
+            if (method.IsConstructor == false)
+            {
+                // Write the return type of method
+                this.Visit(method.Type);
+                //this.writer.WriteSpace();
+
+                // Write the name of the method
+                //this.writer.Write(method);
+
+                // Write generic arguments
+                this.Visit(method.GenericParameters);
+            }
+            else
+            {
+                // Write the name of the type
+                INamedTypeReference type;
+
+                type = method.ContainingTypeDefinition as INamedTypeReference;
+
+                //this.writer.Write(type);
+            }
+
+            // Write parameters
+            this.Visit(method.Parameters);
+
+            // Write generic constraints
+            this.VisitGenericConstraints(method.GenericParameters);
+
+            if (method.IsAbstract == true || method.IsExternal == true)
+            {
+                //this.writer.WriteEndInstruction();
+            }
+            else
+            {
+                // Write statements
+                this.Visit(method.Body);
+            }
+        }
+
+        public override void Visit(IModulus modulus)
+        {
+            this.Visit(modulus, CSharpLanguage.ModulusToken);
+        }
+
+        public override void Visit(IMultiplication multiplication)
+        {
+            this.Visit(multiplication, CSharpLanguage.MultiplicationToken);
+        }
+
+        public override void Visit(INamespaceTypeDefinition namespaceTypeDefinition)
+        {
+            this.Visit(namespaceTypeDefinition.Attributes);
+
+            if (namespaceTypeDefinition.IsPublic == true)
+            {
+                ////this.writer.WriteKeyword(CSharpLanguage.PublicToken);
+            }
+            else
+            {
+                ////this.writer.WriteKeyword(CSharpLanguage.InternalToken);
+            }
+
+            this.VisitNamedTypeDefinition((INamedTypeDefinition)namespaceTypeDefinition);
+        }
+
+        public override void Visit(INamespaceTypeReference namespaceTypeReference)
+        {
+            string keywordType;
+
+            keywordType = CSharpLanguage.GetKeywordType(namespaceTypeReference);
+
+            if (keywordType != null)
+            {
+                //this.writer.WriteReference(namespaceTypeReference, keywordType);
+            }
+            else
+            {
+                //this.writer.WriteReference(namespaceTypeReference);
+            }
+        }
+
+        public override void Visit(INestedTypeDefinition nestedTypeDefinition)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.GetVisibility(nestedTypeDefinition));
+
+            this.VisitNamedTypeDefinition(nestedTypeDefinition);
+
+            //this.writer.NewLine();
+        }
+
+        public override void Visit(INotEquality notEquality)
+        {
+            this.Visit(notEquality, CSharpLanguage.NotEqualToken);
+        }
+
+        public override void Visit(IGenericParameter genericParameter)
+        {
+            if (genericParameter.Variance == TypeParameterVariance.Contravariant)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.InToken);
+                //this.writer.WriteSpace();
+            }
+            else if (genericParameter.Variance == TypeParameterVariance.Covariant)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.OutToken);
+                //this.writer.WriteSpace();
+            }
+
+            //this.writer.Write(genericParameter);
+        }
+
+        public override void Visit(IGenericMethodParameter genericMethodParameter)
+        {
+            this.Visit((IGenericParameter)genericMethodParameter);
+        }
+
+        public override void Visit(IGenericMethodParameterReference genericMethodParameterReference)
+        {
+            this.Visit(genericMethodParameterReference.ResolvedType);
+        }
+
+        public override void Visit(IGenericTypeInstanceReference genericTypeInstanceReference)
+        {
+            this.Visit(genericTypeInstanceReference.GenericType);
+
+            //this.writer.Write(CSharpLanguage.LeftAngleBracket);
+            GenerateCommaSeparateItems(genericTypeInstanceReference.GenericArguments, a => this.Visit(a));
+            //this.writer.Write(CSharpLanguage.RightAngleBracket);
+        }
+
+        public override void Visit(IGenericTypeParameter genericTypeParameter)
+        {
+            this.Visit((IGenericParameter)genericTypeParameter);
+        }
+
+        public override void Visit(IGenericTypeParameterReference genericTypeParameterReference)
+        {
+            this.Visit(genericTypeParameterReference.ResolvedType);
+        }
+
+        public override void Visit(IGreaterThan greaterThan)
+        {
+            this.Visit(greaterThan, CSharpLanguage.GreaterThanToken);
+        }
+
+        public override void Visit(IGreaterThanOrEqual greaterThanOrEqual)
+        {
+            this.Visit(greaterThanOrEqual, CSharpLanguage.GreaterThanOrEqualToken);
+        }
+
+        public override void Visit(IGotoStatement gotoStatement)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.GotoToken);
+            //this.writer.WriteSpace();
+
+            //this.writer.Write(gotoStatement.TargetStatement.Label);
+            //this.writer.WriteEndInstruction();
+        }
+
+        public override void Visit(ILabeledStatement labeledStatement)
+        {
+            //this.writer.Unindent();
+
+            //this.writer.Write(labeledStatement.Label);
+            //this.writer.Write(CSharpLanguage.ColonToken);
+
+            //this.writer.Indent();
+
+            this.Visit(labeledStatement.Statement);
+        }
+
+        public override void Visit(IOrOperation orExpression)
+        {
+            this.Visit(orExpression, CSharpLanguage.OrToken);
+        }
+
+        public override void Visit(IParameterDefinition parameterDefinition)
+        {
+            if (parameterDefinition.IsOut == true)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.OutToken);
+                //this.writer.WriteSpace();
+            }
+            else if (parameterDefinition.IsByReference == true)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.RefToken);
+                //this.writer.WriteSpace();
+            }
+            else if (parameterDefinition.IsParameterArray == true)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.ParamsToken);
+                //this.writer.WriteSpace();
+            }
+
+            this.Visit(parameterDefinition.Type);
+
+            //this.writer.WriteSpace();
+            //this.writer.Write(parameterDefinition);
+        }
+
+        public override void Visit(IPropertyDefinition propertyDefinition)
+        {
+            this.Visit(propertyDefinition.Attributes);
+
+            IMethodDefinition methodReference;
+
+            // Write the visibility and modifiers
+            methodReference = propertyDefinition.GetMethodReference();
+            this.GenerateVisibilityAndModifier(methodReference);
+
+            // Write the return type of property
+            this.Visit(propertyDefinition.Type);
+            //this.writer.WriteSpace();
+
+            // Write the property name
+            if (propertyDefinition.Name.Value == ItemPropertyName)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.ThisToken);
+
+                //this.writer.Write("[");
+                this.GenerateCommaSeparateItems(propertyDefinition.GetMethodReference().Parameters, parameter => this.Visit(parameter));
+                //this.writer.Write("]");
+            }
+            else
+            {
+                //this.writer.Write(propertyDefinition.Name);
+            }
+
+            // Write the property block
+            //this.writer.OpenBlock();
+
+            // If a getter is specified, write it
+            if (propertyDefinition.Getter != null)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.GetToken);
+
+                if (propertyDefinition.Getter.ResolvedMethod.IsAbstract == false)
+                {
+                    this.Visit(propertyDefinition.Getter.ResolvedMethod.Body);
+                }
+                else
+                {
+                    //this.writer.WriteEndInstruction();
+                }
+            }
+
+            if (propertyDefinition.Setter != null)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.SetToken);
+
+                if (propertyDefinition.Getter.ResolvedMethod.IsAbstract == false)
+                {
+                    this.Visit(propertyDefinition.Setter.ResolvedMethod.Body);
+                }
+                else
+                {
+                    //this.writer.WriteEndInstruction();
+                }
+            }
+
+            //this.writer.CloseBlock();
+        }
+
+        public override void Visit(IReturnStatement returnStatement)
+        {
+            if (returnStatement.Expression != null)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.ReturnToken);
+                //this.writer.WriteSpace();
+
+                base.Visit(returnStatement);
+
+                //this.writer.WriteEndInstruction();
+            }
+        }
+
+        public override void Visit(IRightShift rightShift)
+        {
+            this.Visit(rightShift, CSharpLanguage.RightShiftToken);
+        }
+
+        public override void Visit(ISubtraction subtraction)
+        {
+            this.Visit(subtraction, CSharpLanguage.SubtractionToken);
+        }
+
+        public override void Visit(ISwitchCase switchCase)
+        {
+            if (switchCase.IsDefault == true)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.DefaultToken);
+                //this.writer.WriteSpace();
+            }
+            else
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.CaseToken);
+                //this.writer.WriteSpace();
+
+                this.Visit(switchCase.Expression);
+            }
+
+            //this.writer.Write(CSharpLanguage.ColonToken);
+
+            //this.writer.Indent();
+            this.Visit(switchCase.Body);
+            //this.writer.Unindent();
+
+            if (switchCase.IsDefault == false)
+            {
+                //this.writer.NewLine();
+            }
+        }
+
+        public override void Visit(ISwitchStatement switchStatement)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.SwitchToken);
+            //this.writer.WriteSpace();
+
+            //this.writer.WriteLeftParenthesis();
+            this.Visit(switchStatement.Expression);
+            //this.writer.WriteRightParenthesis();
+
+            this.Visit(switchStatement.Cases);
+        }
+
+        public override void Visit(ITargetExpression targetExpression)
+        {
+            if (targetExpression.Instance != null)
+            {
+                this.Visit(targetExpression.Instance);
+            }
+
+            var loc = targetExpression.Definition as ILocalDefinition;
+            if (loc != null)
+            {
+                this.VisitReference(loc);
+            }
+            else
+            {
+                var par = targetExpression.Definition as IParameterDefinition;
+                if (par != null)
+                {
+                    this.VisitReference(par);
+                }
+                else
+                {
+                    var fieldReference = targetExpression.Definition as IFieldReference;
+                    if (fieldReference != null)
+                    {
+                        //this.writer.Write(CSharpLanguage.PointToken);
+                        this.Visit(fieldReference);
+                    }
+                    else
+                    {
+                        var indexer = targetExpression.Definition as IArrayIndexer;
+                        if (indexer != null)
+                        {
+                            this.Visit(indexer);
+                        }
+                        else
+                        {
+                            var address = targetExpression.Definition as IAddressDereference;
+                            if (address != null)
+                            {
+                                this.Visit(address);
+                            }
+                            else
+                            {
+                                var method = targetExpression.Definition as IMethodReference;
+                                if (method != null)
+                                {
+                                    //this.writer.Write(CSharpLanguage.PointToken);
+                                    this.Visit(method);
+                                }
+                                else
+                                {
+                                    //this.writer.Write(CSharpLanguage.PointToken);
+                                    this.VisitReference((IPropertyDefinition)targetExpression.Definition);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public override void Visit(ITryCatchFinallyStatement tryCatchFilterFinallyStatement)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.TryToken);
+            this.Visit(tryCatchFilterFinallyStatement.TryBody);
+
+            foreach (ICatchClause catchClause in tryCatchFilterFinallyStatement.CatchClauses)
+            {
+                this.Visit(catchClause);
+            }
+
+            if (tryCatchFilterFinallyStatement.FinallyBody != null)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.FinallyToken);
+                this.Visit(tryCatchFilterFinallyStatement.FinallyBody);
+            }
+        }
+
+        public override void Visit(IThisReference thisReference)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.ThisToken);
+        }
+
+        public override void Visit(IThrowStatement throwStatement)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.ThrowToken);
+            //this.writer.WriteSpace();
+
+            this.Visit(throwStatement.Exception);
+            //this.writer.WriteEndInstruction();
+        }
+
+        public override void Visit(ITypeDefinition typeDefinition)
+        {
+            eFlowType eFlowType = new eFlowType();
+            eFlowType.Name = typeDefinition.GetDisplayName();
+            eFlowType.FullName = typeDefinition.ToString();
+            this.eFlowAssembly.Types.Add(eFlowType);
+
+            typeDefinition.Dispatch(this);
+        }
+
+        public override void Visit(ITypeOf typeOf)
+        {
+            this.VisitTypeOf(typeOf.TypeToGet);
+        }
+
+        public override void Visit(IUnaryNegation unaryNegation)
+        {
+            this.Visit(unaryNegation.Operand);
+            //this.writer.Write(CSharpLanguage.SubtractionToken);
+            //this.writer.Write(CSharpLanguage.SubtractionToken);
+        }
+
+        public override void Visit(IUnaryPlus unaryPlus)
+        {
+            this.Visit(unaryPlus.Operand);
+            //this.writer.Write(CSharpLanguage.AdditionToken);
+            //this.writer.Write(CSharpLanguage.AdditionToken);
+        }
+
+        public override void Visit(IDoUntilStatement doUntilStatement)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.DoToken);
+
+            this.Visit(doUntilStatement.Body);
+
+            //this.writer.WriteKeyword(CSharpLanguage.WhileToken);
+            //this.writer.WriteSpace();
+            this.Visit(doUntilStatement.Condition);
+        }
+
+        public override void Visit(IWhileDoStatement whileDoStatement)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.WhileToken);
+            //this.writer.WriteSpace();
+
+            this.Visit(whileDoStatement.Condition);
+            this.Visit(whileDoStatement.Body);
+        }
+
+        private void VisitConstant(ITypeReference type, object value)
+        {
+            if (type.TypeCode == PrimitiveTypeCode.String)
+            {
+                //this.writer.WriteString((string)value);
+            }
+            else if (type.TypeCode == PrimitiveTypeCode.Boolean)
+            {
+                bool b;
+
+                b = (bool)value;
+
+                if (b == true)
+                {
+                    //this.writer.WriteKeyword(CSharpLanguage.TrueToken);
+                }
+                else
+                {
+                    //this.writer.WriteKeyword(CSharpLanguage.FalseToken);
+                }
+            }
+            else if (type.TypeCode == PrimitiveTypeCode.Char)
+            {
+                //this.writer.WriteChar((char)value);
+            }
+            else if (type == this.PlatformType.SystemObject && value == null)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.NullToken);
+            }
+            else
+            {
+                //this.writer.Write("{0}", value);
+            }
+        }
+
+        private void VisitConstructorCall(IMethodCall constructorCall)
+        {
+            IThisReference thisReference;
+
+            thisReference = (IThisReference)constructorCall.ThisArgument;
+
+            //this.writer.Write(" : ");
+
+            if (thisReference.Type == constructorCall.MethodToCall.ContainingType)
+            {
+                // Call to other constructor on the same type
+                //this.writer.WriteKeyword(CSharpLanguage.ThisToken);
+            }
+            else
+            {
+                // Call to base constructor
+                //this.writer.WriteKeyword(CSharpLanguage.BaseToken);
+            }
+
+            this.Visit(constructorCall.Arguments);
+        }
+
+        private void VisitDelegate(INamedTypeDefinition delegateDefinition)
+        {
+            IMethodDefinition method;
+
+            method = delegateDefinition.Methods.Where(m => m.Name == this.metadataHost.NameTable.Invoke).Single();
+
+            //this.writer.WriteKeyword(CSharpLanguage.DelegateToken);
+            //this.writer.WriteSpace();
+
+            this.Visit(method.Type);
+            //this.writer.WriteSpace();
+
+            //this.writer.Write(delegateDefinition.Name.Value);
+            this.Visit(delegateDefinition.GenericParameters);
+            this.Visit(method.Parameters);
+
+            // Write generic constraints
+            this.VisitGenericConstraints(delegateDefinition.GenericParameters);
+
+            //this.writer.WriteEndInstruction();
+        }
+
+        private void VisitEnum(INamedTypeDefinition enumDefinition)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.EnumToken);
+            //this.writer.WriteSpace();
+            //this.writer.Write(enumDefinition);
+
+            //this.writer.OpenBlock();
+
+            IFieldDefinition[] enumFields;
+
+            enumFields = enumDefinition.GetEnumFieldValues().ToArray();
+            if (enumFields.Length > 0)
+            {
+                this.VisitEnumField(enumFields[0]);
+
+                for (int i = 1; i < enumFields.Length; i++)
+                {
+                    //this.writer.Write(",");
+                    //this.writer.NewLine();
+
+                    this.VisitEnumField(enumFields[i]);
+                }
+            }
+
+            //this.writer.CloseBlock();
+        }
+
+        private void VisitEnumField(IFieldDefinition enumField)
+        {
+            //this.writer.Write(enumField);
+
+            //this.writer.Write(" = ");
+            this.Visit(enumField.CompileTimeValue);
+        }
+
+        private void VisitGenericConstraints(IEnumerable<IGenericParameter> genericParameters)
+        {
+            if (genericParameters.Count() > 0)
+            {
+                foreach (IGenericParameter genericParameter in genericParameters)
+                {
+                    if (genericParameter.HasConstraints() == true)
+                    {
+                        //this.writer.Indent();
+                        this.VisitGenericConstraint(genericParameter);
+                        //this.writer.Unindent();
+                    }
+                }
+            }
+        }
+
+        private void VisitGenericConstraint(IGenericParameter genericParameter)
+        {
+            bool commaNeeded;
+
+            //this.writer.WriteSpace();
+            //this.writer.WriteKeyword(CSharpLanguage.WhereToken);
+            //this.writer.WriteSpace();
+
+            //this.writer.Write(genericParameter);
+            //this.writer.WriteSpace();
+            //this.writer.Write(CSharpLanguage.ColonToken);
+            //this.writer.WriteSpace();
+
+            // Write class or struct constaint
+            if (genericParameter.MustBeReferenceType == true)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.ClassToken);
+                commaNeeded = true;
+            }
+            else if (genericParameter.MustBeValueType == true)
+            {
+                //this.writer.WriteKeyword(CSharpLanguage.StructToken);
+                commaNeeded = true;
+            }
+            else
+            {
+                commaNeeded = false;
+            }
+
+            // Write base class constraints
+            if (genericParameter.Constraints.Count() > 0)
+            {
+                if (commaNeeded == true)
+                {
+                    //this.writer.Write(CSharpLanguage.CommaToken);
+                    //this.writer.WriteSpace();
+                }
+                else
+                {
+                    commaNeeded = true;
+                }
+
+                this.GenerateCommaSeparateItems(genericParameter.Constraints, c => this.Visit(c));
+            }
+
+            // Write new() constraint
+            if (genericParameter.MustHaveDefaultConstructor == true)
+            {
+                if (commaNeeded == true)
+                {
+                    //this.writer.Write(CSharpLanguage.CommaToken);
+                    //this.writer.WriteSpace();
+                }
+
+                //this.writer.WriteKeyword(CSharpLanguage.NewToken);
+                //this.writer.Write(CSharpLanguage.LeftParenthesisToken);
+                //this.writer.Write(CSharpLanguage.RightParenthesisToken);
+            }
+        }
+
+        private void VisitNamedTypeDefinition(INamedTypeDefinition namedTypeDefinition)
+        {
+            ////this.writer.WriteSpace();
+
+            // If delegate, call the VisitDelegate and exit the method
+            if (namedTypeDefinition.IsDelegate == true)
+            {
+                this.VisitDelegate(namedTypeDefinition);
+                return;
+            }
+
+            if (namedTypeDefinition.IsClass == true)
+            {
+                this.eFlowAssembly.Types.Last<eFlowType>().Kind = CSharpLanguage.ClassToken;
+                ////this.writer.WriteKeyword(CSharpLanguage.ClassToken);
+            }
+            else if (namedTypeDefinition.IsStruct == true)
+            {
+                this.eFlowAssembly.Types.Last<eFlowType>().Kind = CSharpLanguage.StructToken;
+                ////this.writer.WriteKeyword(CSharpLanguage.StructToken);
+            }
+            else if (namedTypeDefinition.IsInterface == true)
+            {
+                this.eFlowAssembly.Types.Last<eFlowType>().Kind = CSharpLanguage.InterfaceToken;
+                ////this.writer.WriteKeyword(CSharpLanguage.InterfaceToken);
+            }
+            else if (namedTypeDefinition.IsEnum == true)
+            {
+                this.VisitEnum(namedTypeDefinition);
+                return;
+            }
+
+            ////this.writer.WriteSpace();
+            ////this.writer.Write(namedTypeDefinition);
+            this.Visit(namedTypeDefinition.GenericParameters);
+
+            // Write inherited class + interfaces (ignore Object, ValueType, Enum) class
+            ITypeReference[] inheritedTypes;
+            inheritedTypes = namedTypeDefinition.BaseClasses
+                .Union(namedTypeDefinition.Interfaces)
+                .ToArray();
+
+            if (inheritedTypes.Length > 0)
+            {
+                //this.writer.Write(" : ");
+                GenerateCommaSeparateItems(inheritedTypes, t => this.Visit(t));
+            }
+
+            //this.writer.OpenBlock();
+
+            this.Visit(namedTypeDefinition.Members.OfType<INestedTypeDefinition>().OrderBy(f => f.Name.Value));
+            this.Visit(namedTypeDefinition.Members.OfType<IFieldDefinition>().OrderBy(f => f.Name.Value));
+            this.Visit(namedTypeDefinition.Members.OfType<IMethodDefinition>().Where(m => m.IsConstructor == true).OrderBy(m => m.Name.Value));
+            this.Visit(namedTypeDefinition.Members.OfType<IMethodDefinition>().Where(m => m.IsSpecialName == false).OrderBy(m => m.Name.Value));
+            this.Visit(namedTypeDefinition.Members.OfType<IPropertyDefinition>().OrderBy(p => p.Name.Value));
+            this.Visit(namedTypeDefinition.Members.OfType<IEventDefinition>().OrderBy(e => e.Name.Value));
+
+            //this.writer.CloseBlock();
+        }
+
+        private void VisitPropertyReference(IPropertyDefinition property, IMethodCall methodCall)
+        {
+            //this.writer.WriteReference(property);
+
+            // If the method is a setter...
+            if (methodCall.MethodToCall.ResolvedMethod.IsSetterMethod() == true)
+            {
+                // ... write the assign operator
+                //this.writer.WriteSpace();
+                //this.writer.Write(CSharpLanguage.AssignToken);
+                //this.writer.WriteSpace();
+
+                // and write the value
+                this.Visit(methodCall.Arguments.ElementAt(0));
+            }
+        }
+
+        public override void VisitReference(ILocalDefinition local)
+        {
+            //this.writer.Write(local);
+        }
+
+        public override void VisitReference(IParameterDefinition parameter)
+        {
+            //this.writer.Write(parameter);
+        }
+
+        private void VisitTypeOf(ITypeReference typeToGet)
+        {
+            //this.writer.WriteKeyword(CSharpLanguage.TypeOfToken);
+
+            //this.writer.WriteLeftParenthesis();
+            this.Visit(typeToGet);
+            //this.writer.WriteRightParenthesis();
+        }
+
+        public void VisitTryCatch(IBlockStatement block)
+        {
+            int qtdTry = 0;
+            int qtdCatch = 0;
+            int qtdCatchGeneric = 0;
+            int qtdCatchSpecialized = 0;
+            int qtdThrowTry = 0;
+            int qtdThrowCatch = 0;
+            int qtdThrowFinally = 0;
+            int qtdFinally = 0;
+
+            BasicBlock basicBlock;
+
+            basicBlock = block as BasicBlock;
+
+            if (basicBlock != null)
+            {
+                for (int i = 0; i < basicBlock.Statements.Count; i++)
+                {
+                    // Recupera blocos Try/Cath/Finally
+                    ITryCatchFinallyStatement tryCatchFilterFinallyStatement;
+                    tryCatchFilterFinallyStatement = basicBlock.Statements[i] as ITryCatchFinallyStatement;
+
+                    if (tryCatchFilterFinallyStatement != null)
+                    {
+                        // Captura os Throws dos blocos Try e Finally
+                        List<IStatement> ThrowsIntoTry;
+                        List<IStatement> ThrowsIntoFinally;
+
+                        if (tryCatchFilterFinallyStatement.TryBody != null)
+                        {
+                            ThrowsIntoTry = tryCatchFilterFinallyStatement.TryBody.Statements.ToList().FindAll
+                                (st => st.GetType().Equals(typeof(ThrowStatement)));
+
+                            qtdThrowTry += ThrowsIntoTry.Count;
+                            qtdTry++;
+
+                            foreach (ThrowStatement newThrow in ThrowsIntoTry)
+                                eFlowAssembly.RegisterException(newThrow.Exception.Type.ToString());
+
+                        }
+                        if (tryCatchFilterFinallyStatement.FinallyBody != null)
+                        {
+                            ThrowsIntoFinally = tryCatchFilterFinallyStatement.FinallyBody.Statements.ToList().FindAll
+                                (st => st.GetType().Equals(typeof(ThrowStatement)));
+
+                            qtdThrowFinally += ThrowsIntoFinally.Count;
+                            qtdFinally++;
+
+                            foreach (ThrowStatement newThrow in ThrowsIntoFinally)
+                                eFlowAssembly.RegisterException(newThrow.Exception.Type.ToString());
+                        }
+
+                        foreach (ICatchClause catchClause in tryCatchFilterFinallyStatement.CatchClauses)
+                        {
+                            // Contabiliza os blocos Catch e seus tipos 
+                            qtdCatch++;
+
+                            Type Exception = Type.GetType(catchClause.ExceptionType.ResolvedType.ToString());
+
+                            // Captura e registra as exceções dos Catchs (>> Inicio Catch Log)
+                            eFlowAssembly.RegisterException(catchClause.ExceptionType.ResolvedType.ToString());
+                            eFlowMethodException eFlowMethodException = new eFlowMethodException();
+                            eFlowAttributeReference ExceptionReference = new eFlowAttributeReference();
+                            ExceptionReference.Reference = 0;
+                            eFlowMethodException.ExceptionReference = ExceptionReference;
+                            eFlowMethodException.Kind = "Catch";
+                            eFlowMethodException.IsGeneric = Exception.Equals(typeof(Exception));
+                            eFlowMethodException.StartOffSet = 0;
+                            eFlowMethodException.EndOffSet = 0;
+
+                            if (Exception.Equals(typeof(Exception)))
+                                qtdCatchGeneric++;
+                            else
+                                qtdCatchSpecialized++;
+
+                            // Contabiliza Throws dos blocos Catch
+                            BasicBlock catchBlock;
+                            catchBlock = (BasicBlock)catchClause.Body;
+
+                            //List<IStatement> ThrowsIntoCatch = catchBlock.Statements.FindAll(
+                            //    delegate(IStatement statement)
+                            //    {
+                            //        return statement.GetType().Equals(typeof(ThrowStatement));
+                            //    });
+
+                            List<IStatement> ThrowsIntoCatch = catchBlock.Statements.FindAll
+                                (st => st.GetType().Equals(typeof(RethrowStatement)));
+
+                            foreach (ThrowStatement newThrow in ThrowsIntoCatch)
+                            {
+                                // Captura e registra as exceções dos Throw dentro dos Catchs 
+                                eFlowAssembly.RegisterException(newThrow.Exception.Type.ToString());
+                                eFlowMethodException eFlowMethodExceptionThrowIntoCatch = new eFlowMethodException();
+                                eFlowAttributeReference ExceptionReferenceThrowIntoCatch = new eFlowAttributeReference();
+                                ExceptionReferenceThrowIntoCatch.Reference = 0;
+                                eFlowMethodExceptionThrowIntoCatch.ExceptionReference = ExceptionReference;
+                                eFlowMethodExceptionThrowIntoCatch.Kind = "Throw";
+                                eFlowMethodExceptionThrowIntoCatch.IsGeneric = Exception.Equals(typeof(Exception));
+                                eFlowMethodExceptionThrowIntoCatch.StartOffSet = 0;
+                                eFlowMethodExceptionThrowIntoCatch.EndOffSet = 0;
+                                this.eFlowAssembly.Types.Last<eFlowType>().Methods.Last<eFlowMethod>().MethodExceptions.Add(eFlowMethodExceptionThrowIntoCatch);
+
+                                // Adicionando a descrição do Throw do Catch (>> Finalização Catch Log)
+                                // TODO: verificar se há como retornar mais de um throw dentro de um statement
+                                eFlowThrowsIntoCatch eFlowThrowsIntoCatch = new eFlowThrowsIntoCatch();
+                                eFlowThrowsIntoCatch.String = newThrow.Exception.Type.ToString();
+                                eFlowMethodException.ThrowsIntoCatch = eFlowThrowsIntoCatch;
+                                this.eFlowAssembly.Types.Last<eFlowType>().Methods.Last<eFlowMethod>().MethodExceptions.Add(eFlowMethodException);
+                            }
+
+                            qtdThrowCatch += ThrowsIntoCatch.Count;
+                        }
+
+                        // Contabiliza os blocos Finally
+                        //TODO: Captura e registra as exceções dos Throw dentro dos Finally
+                        qtdFinally = tryCatchFilterFinallyStatement.FinallyBody != null ? 1 : 0;
+                    }
+                }
+            }
+
+            eFlowMethod method = this.eFlowAssembly.Types.Last<eFlowType>().Methods.Last<eFlowMethod>();
+            method.QtdCatch = qtdCatch;
+            method.QtdCatchGeneric = qtdCatchGeneric;
+            method.QtdCatchSpecialized = qtdCatchSpecialized;
+            method.QtdFinally = qtdFinally;
+            method.QtdThrow = qtdThrowTry + qtdThrowCatch + qtdThrowFinally;
+            method.QtdTry = qtdTry;
+
+            base.Visit(block);
+        }
+    }
+}

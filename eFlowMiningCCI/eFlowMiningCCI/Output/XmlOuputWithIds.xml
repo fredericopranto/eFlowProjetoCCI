@@ -1,0 +1,234 @@
+<list id="1">
+  <assembly id="2">
+    <name>ClassLibraryExemplo</name>
+    <version>1.0.0.0</version>
+    <createdAt id="3">2013-10-18 12:13:27.856 UTC</createdAt>
+    <language>C#.NET</language>
+    <analyzer>false</analyzer>
+    <exceptions id="4">
+      <exception id="5">
+        <name>System.Exception</name>
+        <basename>System.Object</basename>
+      </exception>
+    </exceptions>
+    <types id="6">
+      <type id="7">
+        <name>ClasseTests</name>
+        <fullName>ClassLibraryExemplo.ClasseTests</fullName>
+        <kind>class</kind>
+        <methods id="8">
+          <method id="9">
+            <name>Void ClasseTests..ctor()</name>
+            <fullName>System.Void ClassLibraryExemplo.ClasseTests..ctor()</fullName>
+            <visibility>public</visibility>
+            <qtdTry>0</qtdTry>
+            <qtdCatch>0</qtdCatch>
+            <qtdCatchGeneric>0</qtdCatchGeneric>
+            <qtdCatchSpecialized>0</qtdCatchSpecialized>
+            <qtdThrow>0</qtdThrow>
+            <qtdFinally>0</qtdFinally>
+            <methodExceptions id="10"/>
+          </method>
+          <method id="11">
+            <name>Void ClasseTests.MetodoCall()</name>
+            <fullName>System.Void ClassLibraryExemplo.ClasseTests.MetodoCall()</fullName>
+            <visibility>public</visibility>
+            <qtdTry>0</qtdTry>
+            <qtdCatch>0</qtdCatch>
+            <qtdCatchGeneric>0</qtdCatchGeneric>
+            <qtdCatchSpecialized>0</qtdCatchSpecialized>
+            <qtdThrow>0</qtdThrow>
+            <qtdFinally>0</qtdFinally>
+            <methodExceptions id="12"/>
+          </method>
+          <method id="13">
+            <name>Void ClasseTests.MetodoTests()</name>
+            <fullName>System.Void ClassLibraryExemplo.ClasseTests.MetodoTests()</fullName>
+            <visibility>public</visibility>
+            <qtdTry>1</qtdTry>
+            <qtdCatch>1</qtdCatch>
+            <qtdCatchGeneric>0</qtdCatchGeneric>
+            <qtdCatchSpecialized>1</qtdCatchSpecialized>
+            <qtdThrow>2</qtdThrow>
+            <qtdFinally>0</qtdFinally>
+            <methodExceptions id="14">
+              <methodException id="15">
+                <kind>Try</kind>
+                <isGeneric>true</isGeneric>
+                <startOffSet>1</startOffSet>
+                <endOffSet>33</endOffSet>
+              </methodException>
+              <methodException id="16">
+                <kind>ThrowsIntoCatch</kind>
+                <isGeneric>false</isGeneric>
+                <startOffSet>33</startOffSet>
+                <endOffSet>53</endOffSet>
+              </methodException>
+              <methodException id="17">
+                <kind>Catch</kind>
+                <isGeneric>true</isGeneric>
+                <startOffSet>33</startOffSet>
+                <endOffSet>53</endOffSet>
+              </methodException>
+            </methodExceptions>
+          </method>
+          <method id="18">
+            <name>Int32 ClasseTests.RetornaModuloOnze(String)</name>
+            <fullName>System.Int32 ClassLibraryExemplo.ClasseTests.RetornaModuloOnze(System.String)</fullName>
+            <visibility>private</visibility>
+            <qtdTry>0</qtdTry>
+            <qtdCatch>0</qtdCatch>
+            <qtdCatchGeneric>0</qtdCatchGeneric>
+            <qtdCatchSpecialized>0</qtdCatchSpecialized>
+            <qtdThrow>0</qtdThrow>
+            <qtdFinally>0</qtdFinally>
+            <methodExceptions id="19"/>
+          </method>
+        </methods>
+      </type>
+    </types>
+    <methodCalls id="20">
+      <methodCall id="21">
+        <methodSource id="22">
+          <name>Void ClasseTests.MetodoTests()</name>
+          <fullName>System.Void ClassLibraryExemplo.ClasseTests.MetodoTests()</fullName>
+          <visibility>public</visibility>
+          <qtdTry>1</qtdTry>
+          <qtdCatch>1</qtdCatch>
+          <qtdCatchGeneric>0</qtdCatchGeneric>
+          <qtdCatchSpecialized>1</qtdCatchSpecialized>
+          <qtdThrow>2</qtdThrow>
+          <qtdFinally>0</qtdFinally>
+          <methodExceptions id="23">
+            <methodException id="24">
+              <kind>Try</kind>
+              <isGeneric>true</isGeneric>
+              <startOffSet>1</startOffSet>
+              <endOffSet>33</endOffSet>
+            </methodException>
+            <methodException id="25">
+              <kind>ThrowsIntoCatch</kind>
+              <isGeneric>false</isGeneric>
+              <startOffSet>33</startOffSet>
+              <endOffSet>53</endOffSet>
+            </methodException>
+            <methodException id="26">
+              <kind>Catch</kind>
+              <isGeneric>true</isGeneric>
+              <startOffSet>33</startOffSet>
+              <endOffSet>53</endOffSet>
+            </methodException>
+          </methodExceptions>
+        </methodSource>
+        <methodTarget id="27">
+          <name>Void ClasseTests.MetodoCall()</name>
+          <fullName>System.Void ClassLibraryExemplo.ClasseTests.MetodoCall()</fullName>
+          <visibility>public</visibility>
+          <qtdTry>0</qtdTry>
+          <qtdCatch>0</qtdCatch>
+          <qtdCatchGeneric>0</qtdCatchGeneric>
+          <qtdCatchSpecialized>0</qtdCatchSpecialized>
+          <qtdThrow>0</qtdThrow>
+          <qtdFinally>0</qtdFinally>
+          <methodExceptions id="28"/>
+        </methodTarget>
+        <offSet>3</offSet>
+        <order>4</order>
+      </methodCall>
+      <methodCall id="29">
+        <methodSource id="30">
+          <name>Void ClasseTests.MetodoTests()</name>
+          <fullName>System.Void ClassLibraryExemplo.ClasseTests.MetodoTests()</fullName>
+          <visibility>public</visibility>
+          <qtdTry>1</qtdTry>
+          <qtdCatch>1</qtdCatch>
+          <qtdCatchGeneric>0</qtdCatchGeneric>
+          <qtdCatchSpecialized>1</qtdCatchSpecialized>
+          <qtdThrow>2</qtdThrow>
+          <qtdFinally>0</qtdFinally>
+          <methodExceptions id="31">
+            <methodException id="32">
+              <kind>Try</kind>
+              <isGeneric>true</isGeneric>
+              <startOffSet>1</startOffSet>
+              <endOffSet>33</endOffSet>
+            </methodException>
+            <methodException id="33">
+              <kind>ThrowsIntoCatch</kind>
+              <isGeneric>false</isGeneric>
+              <startOffSet>33</startOffSet>
+              <endOffSet>53</endOffSet>
+            </methodException>
+            <methodException id="34">
+              <kind>Catch</kind>
+              <isGeneric>true</isGeneric>
+              <startOffSet>33</startOffSet>
+              <endOffSet>53</endOffSet>
+            </methodException>
+          </methodExceptions>
+        </methodSource>
+        <methodTarget id="35">
+          <name>Void ClasseTests.MetodoCall()</name>
+          <fullName>System.Void ClassLibraryExemplo.ClasseTests.MetodoCall()</fullName>
+          <visibility>public</visibility>
+          <qtdTry>0</qtdTry>
+          <qtdCatch>0</qtdCatch>
+          <qtdCatchGeneric>0</qtdCatchGeneric>
+          <qtdCatchSpecialized>0</qtdCatchSpecialized>
+          <qtdThrow>0</qtdThrow>
+          <qtdFinally>0</qtdFinally>
+          <methodExceptions id="36"/>
+        </methodTarget>
+        <offSet>16</offSet>
+        <order>9</order>
+      </methodCall>
+      <methodCall id="37">
+        <methodSource id="38">
+          <name>Void ClasseTests.MetodoTests()</name>
+          <fullName>System.Void ClassLibraryExemplo.ClasseTests.MetodoTests()</fullName>
+          <visibility>public</visibility>
+          <qtdTry>1</qtdTry>
+          <qtdCatch>1</qtdCatch>
+          <qtdCatchGeneric>0</qtdCatchGeneric>
+          <qtdCatchSpecialized>1</qtdCatchSpecialized>
+          <qtdThrow>2</qtdThrow>
+          <qtdFinally>0</qtdFinally>
+          <methodExceptions id="39">
+            <methodException id="40">
+              <kind>Try</kind>
+              <isGeneric>true</isGeneric>
+              <startOffSet>1</startOffSet>
+              <endOffSet>33</endOffSet>
+            </methodException>
+            <methodException id="41">
+              <kind>ThrowsIntoCatch</kind>
+              <isGeneric>false</isGeneric>
+              <startOffSet>33</startOffSet>
+              <endOffSet>53</endOffSet>
+            </methodException>
+            <methodException id="42">
+              <kind>Catch</kind>
+              <isGeneric>true</isGeneric>
+              <startOffSet>33</startOffSet>
+              <endOffSet>53</endOffSet>
+            </methodException>
+          </methodExceptions>
+        </methodSource>
+        <methodTarget id="43">
+          <name>Void ClasseTests.MetodoCall()</name>
+          <fullName>System.Void ClassLibraryExemplo.ClasseTests.MetodoCall()</fullName>
+          <visibility>public</visibility>
+          <qtdTry>0</qtdTry>
+          <qtdCatch>0</qtdCatch>
+          <qtdCatchGeneric>0</qtdCatchGeneric>
+          <qtdCatchSpecialized>0</qtdCatchSpecialized>
+          <qtdThrow>0</qtdThrow>
+          <qtdFinally>0</qtdFinally>
+          <methodExceptions id="44"/>
+        </methodTarget>
+        <offSet>36</offSet>
+        <order>17</order>
+      </methodCall>
+    </methodCalls>
+  </assembly>
+</list>

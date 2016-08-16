@@ -1,0 +1,23 @@
+﻿<Window x:Class="TourreauGilles.CciExplorer.Windows.ShellView" x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:prism="http://www.codeplex.com/prism"
+        Title="Gilles TOURREAU - CCI Explorer" Height="350" Width="800" WindowState="Maximized">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="File">
+                <MenuItem Header="Open assembly..." Command="{Binding OpenAssemblyCommand}" />
+            </MenuItem>
+        </Menu>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300px" MinWidth="300px" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ContentControl Grid.Column="0" prism:RegionManager.RegionName="ExplorerRegion" />
+            <GridSplitter Grid.Column="1" Width="2" ResizeBehavior="PreviousAndNext" />
+            <ContentControl Grid.Column="2" prism:RegionManager.RegionName="ContentRegion" HorizontalAlignment="Stretch" />
+        </Grid>
+    </DockPanel>
+</Window>

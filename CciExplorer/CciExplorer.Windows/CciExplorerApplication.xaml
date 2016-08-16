@@ -1,0 +1,90 @@
+﻿<Application x:Class="TourreauGilles.CciExplorer.Windows.CciExplorerApplication"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <Style x:Key="Keyword" TargetType="{x:Type Run}">
+            <Setter Property="Foreground"  Value="Blue"/>
+        </Style>
+        <Style x:Key="Reference" TargetType="{x:Type Hyperlink}">
+            <Setter Property="Foreground"  Value="#FF2B91AF"/>
+            <Setter Property="TextDecorations" Value="{x:Null}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="TextDecorations" Value="Underline" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="String" TargetType="{x:Type Run}">
+            <Setter Property="Foreground"  Value="#FFA31515"/>
+        </Style>
+
+        <Style x:Key="DotNetImage" TargetType="{x:Type Image}">
+            <Setter Property="Width"  Value="16"/>
+            <Setter Property="Height"  Value="16"/>
+        </Style>
+
+        <Style x:Key="AssemblyImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/Assembly.png"/>
+        </Style>
+
+        <Style x:Key="NamespacePublicImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/NamespacePublic.png"/>
+        </Style>
+
+        <Style x:Key="ClassPublicImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/ClassPublic.png"/>
+        </Style>
+
+        <Style x:Key="MethodPublicImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/MethodPublic.png"/>
+        </Style>
+        <Style x:Key="MethodInternalImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/MethodInternal.png"/>
+        </Style>
+        <Style x:Key="MethodProtectedImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/MethodProtected.png"/>
+        </Style>
+        <Style x:Key="MethodPrivateImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/MethodPrivate.png"/>
+        </Style>
+
+        <Style x:Key="PropertyPublicImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/PropertyPublic.png"/>
+        </Style>
+        <Style x:Key="PropertyInternalImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/PropertyInternal.png"/>
+        </Style>
+        <Style x:Key="PropertyProtectedImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/PropertyProtected.png"/>
+        </Style>
+        <Style x:Key="PropertyPrivateImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/PropertyPrivate.png"/>
+        </Style>
+
+        <Style x:Key="EventPublicImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/EventPublic.png"/>
+        </Style>
+        <Style x:Key="EventInternalImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/EventInternal.png"/>
+        </Style>
+        <Style x:Key="EventProtectedImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/EventProtected.png"/>
+        </Style>
+        <Style x:Key="EventPrivateImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/EventPrivate.png"/>
+        </Style>
+
+        <Style x:Key="FieldPublicImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/FieldPublic.png"/>
+        </Style>
+        <Style x:Key="FieldInternalImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/FieldInternal.png"/>
+        </Style>
+        <Style x:Key="FieldProtectedImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/FieldProtected.png"/>
+        </Style>
+        <Style x:Key="FieldPrivateImage" BasedOn="{StaticResource DotNetImage}" TargetType="{x:Type Image}">
+            <Setter Property="Source"  Value="Media/Pictures/FieldPrivate.png"/>
+        </Style>
+    </Application.Resources>
+</Application>
